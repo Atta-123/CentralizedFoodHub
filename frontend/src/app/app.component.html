@@ -1,0 +1,863 @@
+@if (!api.user()) {
+  <div class="login-shell">
+    <section class="login-story">
+      <div class="brand">FoodHub<span>●</span></div>
+      <div>
+        <span class="eyebrow">YOUR CITY. YOUR FAVOURITES.</span>
+        <h1>Great food.<br />One central platform.</h1>
+        <p>
+          Local restaurants, simple ordering and transparent commission. A
+          working marketplace starter.
+        </p>
+        <div class="story-tags">
+          <span>Customer orders</span><span>Restaurant workspace</span
+          ><span>Central administration</span>
+        </div>
+      </div>
+      <small>Local development edition · Cash on delivery</small>
+    </section>
+    <section class="login-form">
+      <div class="eyebrow">WELCOME TO FOODHUB</div>
+      <h2>
+        {{
+          registerMode
+            ? "Create your customer account"
+            : "Sign in to your workspace"
+        }}
+      </h2>
+      <p class="muted">
+        Choose a demo account below, or sign in with your own.
+      </p>
+      @if (error()) {
+        <div class="alert error" role="alert">{{ error() }}</div>
+      }
+      <form (ngSubmit)="auth()">
+        @if (registerMode) {
+          <label
+            >Full name<input
+              name="name"
+              [(ngModel)]="name"
+              required
+              minlength="2"
+              maxlength="80"
+              autocomplete="name"
+          /></label>
+        }
+        <label
+          >Email address<input
+            name="email"
+            type="email"
+            [(ngModel)]="email"
+            required
+            autocomplete="username"
+        /></label>
+        <label
+          >Password<input
+            name="password"
+            type="password"
+            [(ngModel)]="password"
+            required
+            minlength="8"
+            maxlength="100"
+            [attr.autocomplete]="
+              registerMode ? 'new-password' : 'current-password'
+            "
+        /></label>
+        <button class="primary full" [disabled]="busy()">
+          {{
+            busy()
+              ? "Please wait…"
+              : registerMode
+                ? "Create account"
+                : "Sign in"
+          }}
+        </button>
+      </form>
+      <button class="link" (click)="registerMode = !registerMode">
+        {{
+          registerMode
+            ? "Already registered? Sign in"
+            : "New customer? Create an account"
+        }}
+      </button>
+      <div class="demo-box">
+        <small>DEMO ACCOUNTS · PASSWORD: Demo&#64;12345</small>
+        <div class="demo-actions">
+          <button (click)="demo('customer@foodhub.local')">Customer</button
+          ><button (click)="demo('abc@foodhub.local')">Restaurant</button
+          ><button (click)="demo('admin@foodhub.local')">Admin</button>
+        </div>
+        <small>These buttons fill the form. Press Sign in to continue.</small>
+      </div>
+    </section>
+  </div>
+} @else {
+  <header class="topbar">
+    <div class="brand">FoodHub<span>●</span></div>
+    <span class="workspace">{{
+      api.user()?.role === "Admin"
+        ? "Central administration"
+        : api.user()?.role === "Restaurant"
+          ? "Restaurant workspace"
+          : "Explore local food"
+    }}</span>
+    <div class="account">
+      <span
+        >{{ api.user()?.name }} <small>{{ api.user()?.role }}</small></span
+      ><button (click)="logout()">Sign out</button>
+    </div>
+  </header>
+  <div class="app-shell">
+    <aside>
+      <div class="nav-label">WORKSPACE</div>
+      <nav aria-label="Workspace navigation">
+        @if (api.user()?.role === "Admin") {
+          <button
+            [class.active]="view() === 'dashboard'"
+            (click)="navigate('dashboard')"
+          >
+            Overview
+          </button>
+        }
+        <button
+          [class.active]="view() === 'restaurants'"
+          (click)="navigate('restaurants')"
+        >
+          {{
+            api.user()?.role === "Customer"
+              ? "Find restaurants"
+              : "Restaurants & menu"
+          }}
+        </button>
+        <button
+          [class.active]="view() === 'orders'"
+          (click)="navigate('orders')"
+        >
+          {{
+            api.user()?.role === "Customer"
+              ? "My orders"
+              : api.user()?.role === "Admin"
+                ? "All orders"
+                : "Incoming orders"
+          }}
+        </button>
+        @if (api.user()?.role !== "Customer") {
+          <button
+            [class.active]="view() === 'settlements'"
+            (click)="navigate('settlements')"
+          >
+            Earnings summary
+          </button>
+        }
+      </nav>
+      <div class="sidebar-note">
+        <strong>One platform.<br />Connected restaurants.</strong>
+        <p>Commission is captured when each order is placed.</p>
+      </div>
+    </aside>
+    <main>
+      @if (error()) {
+        <div class="alert error" role="alert">
+          {{ error()
+          }}<button (click)="error.set('')" aria-label="Dismiss error">
+            ×
+          </button>
+        </div>
+      }
+      @if (notice()) {
+        <div class="alert success" role="status">{{ notice() }}</div>
+      }
+      @if (view() === "dashboard") {
+        <div class="page-heading">
+          <div>
+            <span class="eyebrow">PLATFORM PERFORMANCE</span>
+            <h1>Central overview</h1>
+            <p class="muted">
+              Live totals from your database. Revenue counts delivered orders
+              only.
+            </p>
+          </div>
+          <button (click)="navigate('dashboard')">Refresh</button>
+        </div>
+        @if (summary(); as s) {
+          <div class="metrics">
+            <article>
+              <small>Partner restaurants</small>
+              <h2>{{ s.restaurants }}</h2>
+            </article>
+            <article>
+              <small>Total orders</small>
+              <h2>{{ s.orders }}</h2>
+              <span>{{ s.deliveredOrders }} delivered</span>
+            </article>
+            <article>
+              <small>Delivered food sales</small>
+              <h2>{{ money(s.deliveredSales) }}</h2>
+            </article>
+            <article class="highlight">
+              <small>Platform commission</small>
+              <h2>{{ money(s.commissionRevenue) }}</h2>
+              <span>Revenue before expenses</span>
+            </article>
+          </div>
+          <section class="panel">
+            <div class="section-heading">
+              <h2>Restaurant net payable</h2>
+              <strong>{{ money(s.restaurantPayable) }}</strong>
+            </div>
+            <p class="muted">
+              Delivered food sales minus the commission stored on each order.
+              This is an earnings report; bank payouts are not processed.
+            </p>
+          </section>
+        }
+      }
+      @if (view() === "restaurants") {
+        <div class="page-heading">
+          <div>
+            <span class="eyebrow">{{
+              api.user()?.role === "Customer"
+                ? "FRESH PICKS, CLOSE TO HOME"
+                : "PARTNER NETWORK"
+            }}</span>
+            <h1>
+              {{
+                api.user()?.role === "Customer"
+                  ? "What are you craving?"
+                  : "Restaurants & menu"
+              }}
+            </h1>
+            <p class="muted">
+              {{
+                api.user()?.role === "Customer"
+                  ? "Select a restaurant, choose your food and place an order."
+                  : "Manage restaurant menus and keep your orders moving."
+              }}
+            </p>
+          </div>
+          @if (api.user()?.role === "Admin") {
+            <button
+              class="primary"
+              (click)="showRestaurantForm = !showRestaurantForm"
+            >
+              + Add restaurant
+            </button>
+          }
+        </div>
+        @if (showRestaurantForm) {
+          <section class="panel">
+            <h2>Add a restaurant and owner</h2>
+            <form class="form-grid" (ngSubmit)="createRestaurant()">
+              <label
+                >Restaurant name<input
+                  name="rname"
+                  [(ngModel)]="restaurantForm.name"
+                  required
+                  minlength="2"
+                  maxlength="100" /></label
+              ><label
+                >Cuisine<input
+                  name="cuisine"
+                  [(ngModel)]="restaurantForm.cuisine"
+                  required
+                  maxlength="80" /></label
+              ><label
+                >Address<input
+                  name="raddress"
+                  [(ngModel)]="restaurantForm.address"
+                  required
+                  maxlength="300" /></label
+              ><label
+                >Commission per order (%)<input
+                  name="commission"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  [(ngModel)]="restaurantForm.commissionPercent"
+                  required /></label
+              ><label
+                >Owner login email<input
+                  name="owneremail"
+                  type="email"
+                  [(ngModel)]="restaurantForm.ownerEmail"
+                  required /></label
+              ><label
+                >Owner password<input
+                  name="ownerpassword"
+                  type="password"
+                  minlength="8"
+                  maxlength="100"
+                  [(ngModel)]="restaurantForm.ownerPassword"
+                  required
+                  autocomplete="new-password"
+              /></label>
+              <label
+                >Restaurant latitude<input
+                  name="restaurantLatitude"
+                  type="number"
+                  min="-90"
+                  max="90"
+                  step="any"
+                  [(ngModel)]="restaurantForm.latitude"
+                  required
+              /></label>
+              <label
+                >Restaurant longitude<input
+                  name="restaurantLongitude"
+                  type="number"
+                  min="-180"
+                  max="180"
+                  step="any"
+                  [(ngModel)]="restaurantForm.longitude"
+                  required
+              /></label>
+              <label
+                >Delivery radius (km)<input
+                  name="restaurantRadius"
+                  type="number"
+                  min="0.1"
+                  max="50"
+                  step="0.1"
+                  [(ngModel)]="restaurantForm.deliveryRadiusKm"
+                  required
+              /></label>
+              <button class="primary" [disabled]="busy()">
+                Create restaurant
+              </button>
+            </form>
+          </section>
+        }
+        @if (api.user()?.role === "Customer") {
+          <section class="panel location-panel">
+            <div class="section-heading">
+              <div>
+                <h2>Your delivery location</h2>
+                <p class="muted">
+                  Use your location or enter delivery coordinates. Restaurants
+                  are sorted nearest first.
+                </p>
+              </div>
+              <button
+                type="button"
+                (click)="useCurrentLocation()"
+                [disabled]="locating()"
+              >
+                {{
+                  locating() ? "Finding location…" : "Use my current location"
+                }}
+              </button>
+            </div>
+            <form class="location-fields" (ngSubmit)="applyLocation()">
+              <label
+                >Delivery latitude<input
+                  name="deliveryLat"
+                  type="number"
+                  step="any"
+                  min="-90"
+                  max="90"
+                  [(ngModel)]="latitude"
+                  required
+              /></label>
+              <label
+                >Delivery longitude<input
+                  name="deliveryLng"
+                  type="number"
+                  step="any"
+                  min="-180"
+                  max="180"
+                  [(ngModel)]="longitude"
+                  required
+              /></label>
+              <label
+                >Search radius (km)<input
+                  name="radius"
+                  type="number"
+                  min="0.1"
+                  max="50"
+                  step="0.1"
+                  [(ngModel)]="radiusKm"
+                  required
+              /></label>
+              <button class="primary" [disabled]="locating()">
+                Find nearby restaurants
+              </button>
+            </form>
+            @if (location(); as loc) {
+              <p class="location-status" role="status">
+                Selected: {{ loc.latitude | number: "1.4-6" }},
+                {{ loc.longitude | number: "1.4-6" }} · {{ loc.radiusKm }} km
+                search radius
+              </p>
+            } @else {
+              <p class="muted">
+                Select a location to filter nearby restaurants and enable
+                checkout.
+              </p>
+            }
+            <small
+              >Demo test coordinates: 34.015, 71.525. Address text does not
+              automatically change these coordinates.</small
+            >
+          </section>
+        }
+        @if (!selected()) {
+          <label class="search-label"
+            >Search restaurants or cuisine<input
+              type="search"
+              [(ngModel)]="search"
+              (ngModelChange)="onSearch()"
+              placeholder="Try burgers, pizza or Pakistani…"
+          /></label>
+          <div class="restaurant-grid">
+            @for (r of restaurants(); track r.id) {
+              <article class="restaurant-card">
+                <div class="restaurant-art">
+                  <span>{{ r.name.charAt(0) }}</span
+                  ><span class="open-badge">{{
+                    r.isOpen ? "Open for orders" : "Closed"
+                  }}</span>
+                </div>
+                <div class="restaurant-content">
+                  <h2>{{ r.name }}</h2>
+                  <p>{{ r.cuisine }}</p>
+                  <small>{{ r.address }}</small>
+                  @if (r.distanceKm !== null && r.distanceKm !== undefined) {
+                    <p class="distance">
+                      {{ r.distanceKm | number: "1.1-1" }} km away · delivers
+                      here
+                    </p>
+                  }
+                  <small
+                    >Delivery range: {{ r.deliveryRadiusKm }} km
+                    (straight-line)</small
+                  >
+                  @if (api.user()?.role === "Admin") {
+                    <form class="settings" (ngSubmit)="saveSettings(r)">
+                      <label
+                        >Commission (%)<input
+                          name="rate"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          [(ngModel)]="r.commissionPercent"
+                          required /></label
+                      ><label class="check"
+                        ><input
+                          name="open"
+                          type="checkbox"
+                          [(ngModel)]="r.isOpen"
+                        />Open</label
+                      ><label
+                        >Latitude<input
+                          name="lat"
+                          type="number"
+                          min="-90"
+                          max="90"
+                          step="any"
+                          [(ngModel)]="r.latitude"
+                          required
+                      /></label>
+                      <label
+                        >Longitude<input
+                          name="lng"
+                          type="number"
+                          min="-180"
+                          max="180"
+                          step="any"
+                          [(ngModel)]="r.longitude"
+                          required
+                      /></label>
+                      <label
+                        >Delivery radius (km)<input
+                          name="deliveryRadius"
+                          type="number"
+                          min="0.1"
+                          max="50"
+                          step="0.1"
+                          [(ngModel)]="r.deliveryRadiusKm"
+                          required
+                      /></label>
+                      <button [disabled]="busy()">Save</button>
+                    </form>
+                    <small>Owner: {{ r.ownerEmail }}</small>
+                  }
+                  @if (api.user()?.role === "Restaurant") {
+                    <p class="commission-note">
+                      Platform commission: {{ r.commissionPercent }}%
+                    </p>
+                  }
+                  <button class="full" (click)="selectRestaurant(r)">
+                    {{
+                      api.user()?.role === "Customer"
+                        ? "View menu"
+                        : "Manage menu"
+                    }}
+                    →
+                  </button>
+                </div>
+              </article>
+            } @empty {
+              <div class="empty">No restaurants found.</div>
+            }
+          </div>
+          <div class="pagination">
+            <button
+              [disabled]="restaurantPage() === 1"
+              (click)="loadRestaurants(restaurantPage() - 1)"
+            >
+              Previous</button
+            ><span
+              >Page {{ restaurantPage() }} ·
+              {{ restaurantTotal() }} restaurants</span
+            ><button
+              [disabled]="restaurantPage() * 12 >= restaurantTotal()"
+              (click)="loadRestaurants(restaurantPage() + 1)"
+            >
+              Next
+            </button>
+          </div>
+        } @else {
+          @if (selected(); as r) {
+            <div class="section-heading">
+              <div>
+                <button class="link" (click)="closeMenu()">
+                  ← All restaurants
+                </button>
+                <h2>{{ r.name }}</h2>
+                <p class="muted">
+                  {{ r.address }} · {{ r.isOpen ? "Open" : "Closed" }}
+                </p>
+              </div>
+              @if (api.user()?.role !== "Customer") {
+                <button class="primary" (click)="editMenu()">
+                  + Add menu item
+                </button>
+              }
+            </div>
+            @if (showMenuForm) {
+              <section class="panel">
+                <h2>{{ editItemId ? "Edit menu item" : "New menu item" }}</h2>
+                <form class="form-grid" (ngSubmit)="saveMenu()">
+                  <label
+                    >Item name<input
+                      name="mname"
+                      [(ngModel)]="menuForm.name"
+                      required
+                      maxlength="100" /></label
+                  ><label
+                    >Price (Rs.)<input
+                      name="mprice"
+                      type="number"
+                      min="0.01"
+                      max="100000"
+                      step="0.01"
+                      [(ngModel)]="menuForm.price"
+                      required /></label
+                  ><label
+                    >Description<input
+                      name="description"
+                      [(ngModel)]="menuForm.description"
+                      maxlength="500" /></label
+                  ><label class="check"
+                    ><input
+                      name="available"
+                      type="checkbox"
+                      [(ngModel)]="menuForm.isAvailable"
+                    />Available</label
+                  ><button class="primary" [disabled]="busy()">Save item</button
+                  ><button type="button" (click)="showMenuForm = false">
+                    Cancel
+                  </button>
+                </form>
+              </section>
+            }
+            <div class="menu-layout">
+              <section class="menu-list">
+                @for (item of menu(); track item.id) {
+                  <article class="menu-row">
+                    <div>
+                      <h3>{{ item.name }}</h3>
+                      <p class="muted">{{ item.description }}</p>
+                      <strong>{{ money(item.price) }}</strong>
+                      @if (!item.isAvailable) {
+                        <small> · Unavailable</small>
+                      }
+                    </div>
+                    @if (api.user()?.role === "Customer") {
+                      <button
+                        class="primary"
+                        [disabled]="!r.isOpen || busy()"
+                        (click)="add(item)"
+                      >
+                        + Add
+                      </button>
+                    } @else {
+                      <button (click)="editMenu(item)">Edit</button>
+                    }
+                  </article>
+                } @empty {
+                  <div class="empty">No menu items available yet.</div>
+                }
+              </section>
+              @if (api.user()?.role === "Customer") {
+                <section class="panel cart">
+                  <span class="eyebrow">YOUR ORDER</span>
+                  <h2>Cart</h2>
+                  @for (line of cart(); track line.item.id) {
+                    <div class="cart-line">
+                      <div>
+                        {{ line.item.name
+                        }}<small>{{ money(line.item.price) }} each</small>
+                      </div>
+                      <div class="quantity">
+                        <button
+                          (click)="remove(line.item.id)"
+                          [disabled]="busy()"
+                          aria-label="Remove one item"
+                        >
+                          −</button
+                        ><span>{{ line.quantity }}</span
+                        ><button
+                          (click)="add(line.item)"
+                          [disabled]="busy() || line.quantity >= 20"
+                          aria-label="Add one item"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  } @empty {
+                    <p class="muted">Your next meal starts here.</p>
+                  }
+                  <div class="total">
+                    <strong>Food total</strong
+                    ><strong>{{ money(subtotal()) }}</strong>
+                  </div>
+                  <small
+                    >Cash on delivery · no delivery fee in this starter</small
+                  >
+                  @if (location(); as loc) {
+                    <p class="muted">
+                      Delivery coordinates:
+                      {{ loc.latitude | number: "1.4-4" }},
+                      {{ loc.longitude | number: "1.4-4" }}
+                    </p>
+                  }
+                  <form (ngSubmit)="checkout()">
+                    <label
+                      >Delivery address<input
+                        name="address"
+                        [(ngModel)]="address"
+                        required
+                        minlength="5"
+                        maxlength="300" /></label
+                    ><label
+                      >Phone number<input
+                        name="phone"
+                        [(ngModel)]="phone"
+                        required
+                        minlength="5"
+                        maxlength="30"
+                        autocomplete="tel" /></label
+                    ><button
+                      class="primary full"
+                      [disabled]="
+                        busy() || !cart().length || !r.isOpen || !location()
+                      "
+                    >
+                      {{ busy() ? "Placing order…" : "Place order" }}
+                    </button>
+                  </form>
+                  <button
+                    class="link"
+                    [disabled]="busy()"
+                    (click)="clearCart()"
+                  >
+                    Clear cart
+                  </button>
+                </section>
+              }
+            </div>
+          }
+        }
+      }
+      @if (view() === "orders") {
+        <div class="page-heading">
+          <div>
+            <span class="eyebrow">ORDER WORKSPACE</span>
+            <h1>
+              {{
+                api.user()?.role === "Customer"
+                  ? "My orders"
+                  : api.user()?.role === "Admin"
+                    ? "All platform orders"
+                    : "Incoming orders"
+              }}
+            </h1>
+            <p class="muted">
+              {{
+                api.user()?.role === "Customer"
+                  ? "Follow your order from acceptance to delivery."
+                  : "Orders are restricted to your authorized workspace."
+              }}
+            </p>
+          </div>
+          <button (click)="loadOrders()">Refresh orders</button>
+        </div>
+        <div class="orders-list">
+          @for (o of orders(); track o.id) {
+            <article class="panel order">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">#{{ short(o.id) }}</span>
+                  <h2>{{ o.restaurantName }}</h2>
+                  <small>{{ o.createdAt | date: "medium" }}</small>
+                </div>
+                <span
+                  class="status"
+                  [class.delivered]="o.status === 'Delivered'"
+                  >{{ label(o.status) }}</span
+                >
+              </div>
+              <div class="order-details">
+                <div>
+                  <p>
+                    <strong>{{ o.customerName }}</strong>
+                  </p>
+                  <p>{{ o.address }}</p>
+                  <small>{{ o.phone }}</small>
+                  <ul>
+                    @for (i of o.items; track $index) {
+                      <li>
+                        {{ i.quantity }} × {{ i.name }}
+                        <span>{{ money(i.unitPrice * i.quantity) }}</span>
+                      </li>
+                    }
+                  </ul>
+                </div>
+                <div class="order-finance">
+                  <div>
+                    <span>Food total</span
+                    ><strong>{{ money(o.subtotal) }}</strong>
+                  </div>
+                  @if (api.user()?.role !== "Customer") {
+                    <div>
+                      <span>Commission ({{ o.commissionPercent }}%)</span
+                      ><strong>{{ money(o.commission) }}</strong>
+                    </div>
+                    <div>
+                      <span>Restaurant net</span
+                      ><strong>{{ money(o.restaurantPayable) }}</strong>
+                    </div>
+                  }
+                  <small>Cash on delivery</small>
+                </div>
+              </div>
+              <div class="order-actions">
+                @for (status of actions(o); track status) {
+                  <button
+                    [class.primary]="
+                      status !== 'Rejected' && status !== 'Cancelled'
+                    "
+                    [disabled]="busy()"
+                    (click)="changeStatus(o, status)"
+                  >
+                    {{
+                      status === "Cancelled"
+                        ? "Cancel order"
+                        : status === "Delivered"
+                          ? "Confirm delivered"
+                          : label(status)
+                    }}
+                  </button>
+                }
+                @if (
+                  o.status === "ReadyForPickup" &&
+                  api.user()?.role === "Restaurant"
+                ) {
+                  <small>Platform admin will confirm delivery.</small>
+                }
+              </div>
+              <details>
+                <summary>Status history</summary>
+                @for (h of o.history; track $index) {
+                  <p class="history">
+                    {{ label(h.status) }} · {{ h.changedAt | date: "medium" }}
+                  </p>
+                }
+              </details>
+            </article>
+          } @empty {
+            <div class="empty">
+              <h2>No orders yet</h2>
+              <p>Your orders will appear here once a customer places one.</p>
+            </div>
+          }
+        </div>
+        <div class="pagination">
+          <button
+            [disabled]="orderPage() === 1"
+            (click)="loadOrders(orderPage() - 1)"
+          >
+            Previous</button
+          ><span>Page {{ orderPage() }} · {{ orderTotal() }} orders</span
+          ><button
+            [disabled]="orderPage() * 12 >= orderTotal()"
+            (click)="loadOrders(orderPage() + 1)"
+          >
+            Next
+          </button>
+        </div>
+      }
+      @if (view() === "settlements") {
+        <div class="page-heading">
+          <div>
+            <span class="eyebrow">TRANSPARENT EARNINGS</span>
+            <h1>Restaurant earnings</h1>
+            <p class="muted">
+              Delivered orders only. Calculated commission, no bank payouts or
+              cash reconciliation.
+            </p>
+          </div>
+          <button (click)="navigate('settlements')">Refresh</button>
+        </div>
+        <section class="panel table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Restaurant</th>
+                <th>Delivered</th>
+                <th>Food sales</th>
+                <th>Commission</th>
+                <th>Net payable</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of settlements(); track s.restaurantId) {
+                <tr>
+                  <td>{{ s.restaurantName }}</td>
+                  <td>{{ s.deliveredOrders }}</td>
+                  <td>{{ money(s.sales) }}</td>
+                  <td>{{ money(s.commission) }}</td>
+                  <td>
+                    <strong>{{ money(s.payable) }}</strong>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5">No delivered orders yet.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      }
+      <footer>
+        FoodHub starter · Prices in PKR · Single-branch restaurants · Cash on
+        delivery
+      </footer>
+    </main>
+  </div>
+}
